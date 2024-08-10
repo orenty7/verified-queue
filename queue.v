@@ -77,6 +77,8 @@ Definition ___compcert_va_int32 : ident := $"__compcert_va_int32".
 Definition ___compcert_va_int64 : ident := $"__compcert_va_int64".
 Definition _cons : ident := $"cons".
 Definition _curr : ident := $"curr".
+Definition _delete_list : ident := $"delete_list".
+Definition _delete_queue : ident := $"delete_queue".
 Definition _exit : ident := $"exit".
 Definition _free : ident := $"free".
 Definition _in : ident := $"in".
@@ -99,7 +101,7 @@ Definition _queue : ident := $"queue".
 Definition _queue_ptr : ident := $"queue_ptr".
 Definition _queue_t : ident := $"queue_t".
 Definition _tail : ident := $"tail".
-Definition _test : ident := $"test".
+Definition _tmp : ident := $"tmp".
 Definition _uncons : ident := $"uncons".
 Definition _val : ident := $"val".
 Definition _value : ident := $"value".
@@ -223,6 +225,27 @@ Definition f_nreverse := {|
               (Sset _curr
                 (Etempvar _next__1 (tptr (Tstruct _list_t noattr))))))))
       (Sreturn (Some (Etempvar _prev (tptr (Tstruct _list_t noattr))))))))
+|}.
+
+Definition f_delete_list := {|
+  fn_return := tvoid;
+  fn_callconv := cc_default;
+  fn_params := ((_list, (tptr (Tstruct _list_t noattr))) :: nil);
+  fn_vars := nil;
+  fn_temps := ((_tmp, (tptr (Tstruct _list_t noattr))) :: nil);
+  fn_body :=
+(Swhile
+  (Etempvar _list (tptr (Tstruct _list_t noattr)))
+  (Ssequence
+    (Sset _tmp (Etempvar _list (tptr (Tstruct _list_t noattr))))
+    (Ssequence
+      (Sset _list
+        (Efield
+          (Ederef (Etempvar _list (tptr (Tstruct _list_t noattr)))
+            (Tstruct _list_t noattr)) _tail (tptr (Tstruct _list_t noattr))))
+      (Scall None
+        (Evar _free (Tfunction (Tcons (tptr tvoid) Tnil) tvoid cc_default))
+        ((Etempvar _tmp (tptr (Tstruct _list_t noattr))) :: nil)))))
 |}.
 
 Definition f_new_queue := {|
@@ -359,31 +382,38 @@ Definition f_pop_front := {|
     (Sreturn (Some (Etempvar _t'1 tint)))))
 |}.
 
-Definition f_test := {|
+Definition f_delete_queue := {|
   fn_return := tvoid;
   fn_callconv := cc_default;
-  fn_params := nil;
+  fn_params := ((_queue, (tptr (Tstruct _queue_t noattr))) :: nil);
   fn_vars := nil;
-  fn_temps := ((_queue, (tptr (Tstruct _queue_t noattr))) ::
-               (_t'1, (tptr (Tstruct _queue_t noattr))) :: nil);
+  fn_temps := ((_t'2, (tptr (Tstruct _list_t noattr))) ::
+               (_t'1, (tptr (Tstruct _list_t noattr))) :: nil);
   fn_body :=
 (Ssequence
   (Ssequence
-    (Scall (Some _t'1)
-      (Evar _new_queue (Tfunction Tnil (tptr (Tstruct _queue_t noattr))
-                         cc_default)) nil)
-    (Sset _queue (Etempvar _t'1 (tptr (Tstruct _queue_t noattr)))))
+    (Sset _t'2
+      (Efield
+        (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+          (Tstruct _queue_t noattr)) _in (tptr (Tstruct _list_t noattr))))
+    (Scall None
+      (Evar _delete_list (Tfunction
+                           (Tcons (tptr (Tstruct _list_t noattr)) Tnil) tvoid
+                           cc_default))
+      ((Etempvar _t'2 (tptr (Tstruct _list_t noattr))) :: nil)))
   (Ssequence
+    (Ssequence
+      (Sset _t'1
+        (Efield
+          (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+            (Tstruct _queue_t noattr)) _out (tptr (Tstruct _list_t noattr))))
+      (Scall None
+        (Evar _delete_list (Tfunction
+                             (Tcons (tptr (Tstruct _list_t noattr)) Tnil)
+                             tvoid cc_default))
+        ((Etempvar _t'1 (tptr (Tstruct _list_t noattr))) :: nil)))
     (Scall None
-      (Evar _push_back (Tfunction
-                         (Tcons (tptr (Tstruct _queue_t noattr))
-                           (Tcons tint Tnil)) tvoid cc_default))
-      ((Etempvar _queue (tptr (Tstruct _queue_t noattr))) ::
-       (Econst_int (Int.repr 10) tint) :: nil))
-    (Scall None
-      (Evar _pop_front (Tfunction
-                         (Tcons (tptr (Tstruct _queue_t noattr)) Tnil) tint
-                         cc_default))
+      (Evar _free (Tfunction (Tcons (tptr tvoid) Tnil) tvoid cc_default))
       ((Etempvar _queue (tptr (Tstruct _queue_t noattr))) :: nil))))
 |}.
 
@@ -674,16 +704,17 @@ Definition global_definitions : list (ident * globdef fundef type) :=
      (Tcons tint Tnil) tvoid cc_default)) ::
  (_cons, Gfun(Internal f_cons)) :: (_uncons, Gfun(Internal f_uncons)) ::
  (_nreverse, Gfun(Internal f_nreverse)) ::
+ (_delete_list, Gfun(Internal f_delete_list)) ::
  (_new_queue, Gfun(Internal f_new_queue)) ::
  (_push_back, Gfun(Internal f_push_back)) ::
  (_normalize, Gfun(Internal f_normalize)) ::
  (_pop_front, Gfun(Internal f_pop_front)) ::
- (_test, Gfun(Internal f_test)) :: nil).
+ (_delete_queue, Gfun(Internal f_delete_queue)) :: nil).
 
 Definition public_idents : list ident :=
-(_test :: _pop_front :: _normalize :: _push_back :: _new_queue ::
- _nreverse :: _uncons :: _cons :: _exit :: _free :: _malloc ::
- ___builtin_debug :: ___builtin_write32_reversed ::
+(_delete_queue :: _pop_front :: _normalize :: _push_back :: _new_queue ::
+ _delete_list :: _nreverse :: _uncons :: _cons :: _exit :: _free ::
+ _malloc :: ___builtin_debug :: ___builtin_write32_reversed ::
  ___builtin_write16_reversed :: ___builtin_read32_reversed ::
  ___builtin_read16_reversed :: ___builtin_fnmsub :: ___builtin_fnmadd ::
  ___builtin_fmsub :: ___builtin_fmadd :: ___builtin_fmin ::

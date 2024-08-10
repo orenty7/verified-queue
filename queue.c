@@ -45,6 +45,14 @@ struct list_t *nreverse(struct list_t *list) {
   return prev;
 }
 
+void delete_list(struct list_t *list) {
+  while (list) {
+    struct list_t *tmp = list;
+    list = list->tail;
+    free(tmp);
+  }
+}
+
 struct queue_t *new_queue() {
   struct queue_t *queue_ptr = (struct queue_t *) malloc(sizeof(struct queue_t));
   if(!queue_ptr) {
@@ -71,4 +79,11 @@ void normalize(struct queue_t *queue) {
 int pop_front(struct queue_t *queue) {
   normalize(queue);
   return uncons(&queue->out);
+}
+
+
+void delete_queue(struct queue_t *queue) {
+  delete_list(queue->in);
+  delete_list(queue->out);
+  free(queue);
 }

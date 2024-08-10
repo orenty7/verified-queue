@@ -111,11 +111,25 @@ Definition nreverse_spec: ident * funspec :=
         RETURN (ptr)
         SEP (listrep (rev values) ptr).
 
+Definition delete_list_spec: ident * funspec := 
+  DECLARE _delete_list
+    WITH values: list Z, ptr: val, gv: globals
+    PRE [ tptr t_list ]
+      PROP ()
+      PARAMS (ptr)
+      GLOBALS (gv)
+      SEP (listrep values ptr; mem_mgr gv)
+    POST [ tvoid ]
+      PROP ()
+      RETURN ()
+      SEP (mem_mgr gv).
+
 Definition t_queue := Tstruct _queue_t noattr.
 
 Definition queuerep (values: list Z) (ptr: val) : mpred :=
   EX (output input: list Z) (output_ptr input_ptr: val), 
-    !!(values = app output (rev input)) &&
+    !!(values = app output (rev input)) && (* values = output ++ rev input *)
+    (malloc_token Ews t_queue ptr) * 
     (data_at Ews t_queue (input_ptr, output_ptr) ptr) *
     (listrep input input_ptr) * 
     (listrep output output_ptr).
@@ -124,6 +138,7 @@ Definition norm_queuerep (values: list Z) (ptr: val) : mpred :=
   EX (output input: list Z) (output_ptr input_ptr: val), 
     !!(output <> []) && 
     !!(values = app output (rev input)) &&
+    (malloc_token Ews t_queue ptr) * 
     (data_at Ews t_queue (input_ptr, output_ptr) ptr) *
     (listrep input input_ptr) * 
     (listrep output output_ptr).
@@ -182,13 +197,30 @@ Definition pop_front_spec: ident * funspec :=
       SEP (queuerep rest queue_ptr; mem_mgr gv).
 
 
+Definition delete_queue_spec: ident * funspec := 
+  DECLARE _delete_queue
+    WITH values: list Z, ptr: val, gv: globals
+    PRE [ tptr t_queue ]
+      PROP ()
+      PARAMS (ptr)
+      GLOBALS (gv)
+      SEP (queuerep values ptr; mem_mgr gv)
+    POST [ tvoid ]
+      PROP ()
+      RETURN ()
+      SEP (mem_mgr gv).
+
 Definition Gprog : funspecs := ltac: (with_library prog [ 
   cons_spec; 
   uncons_spec;
   nreverse_spec; 
+  delete_list_spec;
+
+  new_queue_spec;
   push_back_spec; 
   normalize_spec;
-  pop_front_spec  
+  pop_front_spec;
+  delete_queue_spec
 ]).
 
 Lemma body_cons: semax_body Vprog Gprog f_cons cons_spec.
@@ -323,6 +355,82 @@ Proof.
     entailer!.
 Qed.
 
+Lemma body_delete_list: semax_body Vprog Gprog f_delete_list delete_list_spec.
+Proof.
+  start_function.
+  forward_while (EX values ptr,
+    PROP () 
+    LOCAL (gvars gv; temp _list ptr) 
+    SEP (listrep values ptr; mem_mgr gv)
+  ).
+  - entailer!.
+    Exists values ptr.
+    entailer!.
+  - entailer!.
+  - forward.
+    destruct values0.
+    { unfold listrep. Intros. subst. contradiction. }
+    unfold listrep.
+    fold listrep.
+    Intros tail_ptr.
+    forward.
+    forward_call (t_list, ptr0, gv).
+    + destruct ptr0;
+      try contradiction.
+      simpl.
+      entailer!.
+    + Exists (values0, tail_ptr).
+      entailer!.
+      entailer!.
+  - forward.
+    entailer!.
+    assert (values0_is_nil: values0 = []).
+    { apply H. reflexivity. }
+    rewrite values0_is_nil.
+    unfold listrep.
+    entailer!.
+Qed.
+
+Lemma body_new_queue: semax_body Vprog Gprog f_new_queue new_queue_spec.
+Proof.
+  start_function.
+  forward_call (t_queue, gv).
+  Intros vret.
+  forward_if (
+    PROP ()
+    LOCAL (temp _queue_ptr vret; gvars gv)
+    SEP (
+      malloc_token Ews t_queue vret;
+      data_at_ Ews t_queue vret;
+      mem_mgr gv
+    )
+  ).
+  - destruct vret;
+    try contradiction.
+    + inversion PNvret. subst.
+      simpl.
+      entailer!.
+    + simpl. entailer!.
+  - forward_call.
+    entailer!.
+  - forward.
+    entailer!.
+    destruct vret;
+    try contradiction.
+    + inversion PNvret. subst.
+      contradiction.
+    + simpl. entailer!.
+  - forward.
+    forward.
+    forward.
+    Exists vret.
+    unfold queuerep.
+    Exists (@nil Z) (@nil Z) nullval nullval.
+    entailer!.
+    unfold listrep.
+    entailer!.
+Qed.
+
 Lemma body_push_back: semax_body Vprog Gprog f_push_back push_back_spec.
 Proof.
   start_function.
@@ -355,7 +463,7 @@ Proof.
     Exists (rev input) (@nil Z) reversed_input_ptr nullval.
     entailer!.
     - assert (output_is_nil: output = []).
-      { apply H4. reflexivity. }
+      { apply H5. reflexivity. }
       subst.
       simpl in H.
       split.
@@ -367,7 +475,7 @@ Proof.
         rewrite app_nil_r.
         reflexivity.
     - assert (output_is_nil: output = []).
-      { apply H4. reflexivity. }
+      { apply H5. reflexivity. }
       subst.
       entailer!.
   + forward.
@@ -376,7 +484,7 @@ Proof.
     Exists output input output_ptr input_ptr.
     entailer!.
     apply H0.
-    apply H4.
+    apply H5.
     reflexivity.
 Qed.
 
@@ -400,10 +508,10 @@ Proof.
     Ews 
     (nested_field_type t_queue (DOT _out)) 
     output_ptr 
-    (field_address t_queue (DOT _out) queue_ptr)).
+    (field_address t_queue (DOT _out) queue_ptr)
+  ).
+  
   Intros.
-  sep_apply data_at_local_facts.
-
   forward_call (output_head, output_tail, (field_address t_queue (DOT _out) queue_ptr), gv).
   - unfold listrep_boxed.
     Exists output_ptr.
@@ -418,4 +526,22 @@ Proof.
     entailer!.
     unfold_data_at (data_at _ _ _ queue_ptr).
     entailer!.
+Qed.
+
+
+Lemma body_delete_queue: semax_body Vprog Gprog f_delete_queue delete_queue_spec.
+Proof.
+  start_function.
+  forward.
+  forward_call.
+  forward.
+  forward_call.
+  forward_call (t_queue, ptr, gv).
+  { entailer!.
+    apply field_compatible_isptr in H1.
+    destruct ptr;
+    try contradiction.
+    simpl.
+    entailer!. }
+  entailer!.
 Qed.
