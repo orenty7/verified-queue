@@ -5,7 +5,7 @@ struct list_t {
   struct list_t *tail;
 };
 
-struct queue {
+struct queue_t {
   struct list_t *in, *out;
 };
 
@@ -45,19 +45,30 @@ struct list_t *nreverse(struct list_t *list) {
   return prev;
 }
 
+struct queue_t *new_queue() {
+  struct queue_t *queue_ptr = (struct queue_t *) malloc(sizeof(struct queue_t));
+  if(!queue_ptr) {
+    exit(1);
+  }
 
-void push_back(struct queue *queue, int val) {
+  queue_ptr->in = NULL;
+  queue_ptr->out = NULL;
+
+  return queue_ptr;
+}
+
+void push_back(struct queue_t *queue, int val) {
   queue->in = cons(val, queue->in);
 }
 
-void normalize(struct queue *queue) {
+void normalize(struct queue_t *queue) {
   if(!queue->out) {
     queue->out = nreverse(queue->in);
     queue->in = NULL;
   }
 }
 
-int pop_front(struct queue *queue) {
+int pop_front(struct queue_t *queue) {
   normalize(queue);
   return uncons(&queue->out);
 }

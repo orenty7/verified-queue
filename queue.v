@@ -86,6 +86,7 @@ Definition _list_t : ident := $"list_t".
 Definition _main : ident := $"main".
 Definition _malloc : ident := $"malloc".
 Definition _new_cell : ident := $"new_cell".
+Definition _new_queue : ident := $"new_queue".
 Definition _next : ident := $"next".
 Definition _next__1 : ident := $"next__1".
 Definition _normalize : ident := $"normalize".
@@ -95,8 +96,10 @@ Definition _pop_front : ident := $"pop_front".
 Definition _prev : ident := $"prev".
 Definition _push_back : ident := $"push_back".
 Definition _queue : ident := $"queue".
-Definition _queue__1 : ident := $"queue__1".
+Definition _queue_ptr : ident := $"queue_ptr".
+Definition _queue_t : ident := $"queue_t".
 Definition _tail : ident := $"tail".
+Definition _test : ident := $"test".
 Definition _uncons : ident := $"uncons".
 Definition _val : ident := $"val".
 Definition _value : ident := $"value".
@@ -222,11 +225,49 @@ Definition f_nreverse := {|
       (Sreturn (Some (Etempvar _prev (tptr (Tstruct _list_t noattr))))))))
 |}.
 
+Definition f_new_queue := {|
+  fn_return := (tptr (Tstruct _queue_t noattr));
+  fn_callconv := cc_default;
+  fn_params := nil;
+  fn_vars := nil;
+  fn_temps := ((_queue_ptr, (tptr (Tstruct _queue_t noattr))) ::
+               (_t'1, (tptr tvoid)) :: nil);
+  fn_body :=
+(Ssequence
+  (Ssequence
+    (Scall (Some _t'1)
+      (Evar _malloc (Tfunction (Tcons tulong Tnil) (tptr tvoid) cc_default))
+      ((Esizeof (Tstruct _queue_t noattr) tulong) :: nil))
+    (Sset _queue_ptr
+      (Ecast (Etempvar _t'1 (tptr tvoid)) (tptr (Tstruct _queue_t noattr)))))
+  (Ssequence
+    (Sifthenelse (Eunop Onotbool
+                   (Etempvar _queue_ptr (tptr (Tstruct _queue_t noattr)))
+                   tint)
+      (Scall None (Evar _exit (Tfunction (Tcons tint Tnil) tvoid cc_default))
+        ((Econst_int (Int.repr 1) tint) :: nil))
+      Sskip)
+    (Ssequence
+      (Sassign
+        (Efield
+          (Ederef (Etempvar _queue_ptr (tptr (Tstruct _queue_t noattr)))
+            (Tstruct _queue_t noattr)) _in (tptr (Tstruct _list_t noattr)))
+        (Ecast (Econst_int (Int.repr 0) tint) (tptr tvoid)))
+      (Ssequence
+        (Sassign
+          (Efield
+            (Ederef (Etempvar _queue_ptr (tptr (Tstruct _queue_t noattr)))
+              (Tstruct _queue_t noattr)) _out
+            (tptr (Tstruct _list_t noattr)))
+          (Ecast (Econst_int (Int.repr 0) tint) (tptr tvoid)))
+        (Sreturn (Some (Etempvar _queue_ptr (tptr (Tstruct _queue_t noattr)))))))))
+|}.
+
 Definition f_push_back := {|
   fn_return := tvoid;
   fn_callconv := cc_default;
-  fn_params := ((_queue__1, (tptr (Tstruct _queue noattr))) ::
-                (_val, tint) :: nil);
+  fn_params := ((_queue, (tptr (Tstruct _queue_t noattr))) :: (_val, tint) ::
+                nil);
   fn_vars := nil;
   fn_temps := ((_t'1, (tptr (Tstruct _list_t noattr))) ::
                (_t'2, (tptr (Tstruct _list_t noattr))) :: nil);
@@ -235,8 +276,8 @@ Definition f_push_back := {|
   (Ssequence
     (Sset _t'2
       (Efield
-        (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-          (Tstruct _queue noattr)) _in (tptr (Tstruct _list_t noattr))))
+        (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+          (Tstruct _queue_t noattr)) _in (tptr (Tstruct _list_t noattr))))
     (Scall (Some _t'1)
       (Evar _cons (Tfunction
                     (Tcons tint (Tcons (tptr (Tstruct _list_t noattr)) Tnil))
@@ -245,15 +286,15 @@ Definition f_push_back := {|
        (Etempvar _t'2 (tptr (Tstruct _list_t noattr))) :: nil)))
   (Sassign
     (Efield
-      (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-        (Tstruct _queue noattr)) _in (tptr (Tstruct _list_t noattr)))
+      (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+        (Tstruct _queue_t noattr)) _in (tptr (Tstruct _list_t noattr)))
     (Etempvar _t'1 (tptr (Tstruct _list_t noattr)))))
 |}.
 
 Definition f_normalize := {|
   fn_return := tvoid;
   fn_callconv := cc_default;
-  fn_params := ((_queue__1, (tptr (Tstruct _queue noattr))) :: nil);
+  fn_params := ((_queue, (tptr (Tstruct _queue_t noattr))) :: nil);
   fn_vars := nil;
   fn_temps := ((_t'1, (tptr (Tstruct _list_t noattr))) ::
                (_t'3, (tptr (Tstruct _list_t noattr))) ::
@@ -262,8 +303,8 @@ Definition f_normalize := {|
 (Ssequence
   (Sset _t'2
     (Efield
-      (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-        (Tstruct _queue noattr)) _out (tptr (Tstruct _list_t noattr))))
+      (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+        (Tstruct _queue_t noattr)) _out (tptr (Tstruct _list_t noattr))))
   (Sifthenelse (Eunop Onotbool
                  (Etempvar _t'2 (tptr (Tstruct _list_t noattr))) tint)
     (Ssequence
@@ -271,8 +312,9 @@ Definition f_normalize := {|
         (Ssequence
           (Sset _t'3
             (Efield
-              (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-                (Tstruct _queue noattr)) _in (tptr (Tstruct _list_t noattr))))
+              (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+                (Tstruct _queue_t noattr)) _in
+              (tptr (Tstruct _list_t noattr))))
           (Scall (Some _t'1)
             (Evar _nreverse (Tfunction
                               (Tcons (tptr (Tstruct _list_t noattr)) Tnil)
@@ -280,13 +322,14 @@ Definition f_normalize := {|
             ((Etempvar _t'3 (tptr (Tstruct _list_t noattr))) :: nil)))
         (Sassign
           (Efield
-            (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-              (Tstruct _queue noattr)) _out (tptr (Tstruct _list_t noattr)))
+            (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+              (Tstruct _queue_t noattr)) _out
+            (tptr (Tstruct _list_t noattr)))
           (Etempvar _t'1 (tptr (Tstruct _list_t noattr)))))
       (Sassign
         (Efield
-          (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-            (Tstruct _queue noattr)) _in (tptr (Tstruct _list_t noattr)))
+          (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+            (Tstruct _queue_t noattr)) _in (tptr (Tstruct _list_t noattr)))
         (Ecast (Econst_int (Int.repr 0) tint) (tptr tvoid))))
     Sskip))
 |}.
@@ -294,15 +337,15 @@ Definition f_normalize := {|
 Definition f_pop_front := {|
   fn_return := tint;
   fn_callconv := cc_default;
-  fn_params := ((_queue__1, (tptr (Tstruct _queue noattr))) :: nil);
+  fn_params := ((_queue, (tptr (Tstruct _queue_t noattr))) :: nil);
   fn_vars := nil;
   fn_temps := ((_t'1, tint) :: nil);
   fn_body :=
 (Ssequence
   (Scall None
-    (Evar _normalize (Tfunction (Tcons (tptr (Tstruct _queue noattr)) Tnil)
+    (Evar _normalize (Tfunction (Tcons (tptr (Tstruct _queue_t noattr)) Tnil)
                        tvoid cc_default))
-    ((Etempvar _queue__1 (tptr (Tstruct _queue noattr))) :: nil))
+    ((Etempvar _queue (tptr (Tstruct _queue_t noattr))) :: nil))
   (Ssequence
     (Scall (Some _t'1)
       (Evar _uncons (Tfunction
@@ -310,10 +353,38 @@ Definition f_pop_front := {|
                       tint cc_default))
       ((Eaddrof
          (Efield
-           (Ederef (Etempvar _queue__1 (tptr (Tstruct _queue noattr)))
-             (Tstruct _queue noattr)) _out (tptr (Tstruct _list_t noattr)))
+           (Ederef (Etempvar _queue (tptr (Tstruct _queue_t noattr)))
+             (Tstruct _queue_t noattr)) _out (tptr (Tstruct _list_t noattr)))
          (tptr (tptr (Tstruct _list_t noattr)))) :: nil))
     (Sreturn (Some (Etempvar _t'1 tint)))))
+|}.
+
+Definition f_test := {|
+  fn_return := tvoid;
+  fn_callconv := cc_default;
+  fn_params := nil;
+  fn_vars := nil;
+  fn_temps := ((_queue, (tptr (Tstruct _queue_t noattr))) ::
+               (_t'1, (tptr (Tstruct _queue_t noattr))) :: nil);
+  fn_body :=
+(Ssequence
+  (Ssequence
+    (Scall (Some _t'1)
+      (Evar _new_queue (Tfunction Tnil (tptr (Tstruct _queue_t noattr))
+                         cc_default)) nil)
+    (Sset _queue (Etempvar _t'1 (tptr (Tstruct _queue_t noattr)))))
+  (Ssequence
+    (Scall None
+      (Evar _push_back (Tfunction
+                         (Tcons (tptr (Tstruct _queue_t noattr))
+                           (Tcons tint Tnil)) tvoid cc_default))
+      ((Etempvar _queue (tptr (Tstruct _queue_t noattr))) ::
+       (Econst_int (Int.repr 10) tint) :: nil))
+    (Scall None
+      (Evar _pop_front (Tfunction
+                         (Tcons (tptr (Tstruct _queue_t noattr)) Tnil) tint
+                         cc_default))
+      ((Etempvar _queue (tptr (Tstruct _queue_t noattr))) :: nil))))
 |}.
 
 Definition composites : list composite_definition :=
@@ -321,7 +392,7 @@ Definition composites : list composite_definition :=
    (Member_plain _value tint ::
     Member_plain _tail (tptr (Tstruct _list_t noattr)) :: nil)
    noattr ::
- Composite _queue Struct
+ Composite _queue_t Struct
    (Member_plain _in (tptr (Tstruct _list_t noattr)) ::
     Member_plain _out (tptr (Tstruct _list_t noattr)) :: nil)
    noattr :: nil).
@@ -603,31 +674,33 @@ Definition global_definitions : list (ident * globdef fundef type) :=
      (Tcons tint Tnil) tvoid cc_default)) ::
  (_cons, Gfun(Internal f_cons)) :: (_uncons, Gfun(Internal f_uncons)) ::
  (_nreverse, Gfun(Internal f_nreverse)) ::
+ (_new_queue, Gfun(Internal f_new_queue)) ::
  (_push_back, Gfun(Internal f_push_back)) ::
  (_normalize, Gfun(Internal f_normalize)) ::
- (_pop_front, Gfun(Internal f_pop_front)) :: nil).
+ (_pop_front, Gfun(Internal f_pop_front)) ::
+ (_test, Gfun(Internal f_test)) :: nil).
 
 Definition public_idents : list ident :=
-(_pop_front :: _normalize :: _push_back :: _nreverse :: _uncons :: _cons ::
- _exit :: _free :: _malloc :: ___builtin_debug ::
- ___builtin_write32_reversed :: ___builtin_write16_reversed ::
- ___builtin_read32_reversed :: ___builtin_read16_reversed ::
- ___builtin_fnmsub :: ___builtin_fnmadd :: ___builtin_fmsub ::
- ___builtin_fmadd :: ___builtin_fmin :: ___builtin_fmax ::
- ___builtin_expect :: ___builtin_unreachable :: ___builtin_va_end ::
- ___builtin_va_copy :: ___builtin_va_arg :: ___builtin_va_start ::
- ___builtin_membar :: ___builtin_annot_intval :: ___builtin_annot ::
- ___builtin_sel :: ___builtin_memcpy_aligned :: ___builtin_sqrt ::
- ___builtin_fsqrt :: ___builtin_fabsf :: ___builtin_fabs ::
- ___builtin_ctzll :: ___builtin_ctzl :: ___builtin_ctz :: ___builtin_clzll ::
- ___builtin_clzl :: ___builtin_clz :: ___builtin_bswap16 ::
- ___builtin_bswap32 :: ___builtin_bswap :: ___builtin_bswap64 ::
- ___builtin_ais_annot :: ___compcert_i64_umulh :: ___compcert_i64_smulh ::
- ___compcert_i64_sar :: ___compcert_i64_shr :: ___compcert_i64_shl ::
- ___compcert_i64_umod :: ___compcert_i64_smod :: ___compcert_i64_udiv ::
- ___compcert_i64_sdiv :: ___compcert_i64_utof :: ___compcert_i64_stof ::
- ___compcert_i64_utod :: ___compcert_i64_stod :: ___compcert_i64_dtou ::
- ___compcert_i64_dtos :: ___compcert_va_composite ::
+(_test :: _pop_front :: _normalize :: _push_back :: _new_queue ::
+ _nreverse :: _uncons :: _cons :: _exit :: _free :: _malloc ::
+ ___builtin_debug :: ___builtin_write32_reversed ::
+ ___builtin_write16_reversed :: ___builtin_read32_reversed ::
+ ___builtin_read16_reversed :: ___builtin_fnmsub :: ___builtin_fnmadd ::
+ ___builtin_fmsub :: ___builtin_fmadd :: ___builtin_fmin ::
+ ___builtin_fmax :: ___builtin_expect :: ___builtin_unreachable ::
+ ___builtin_va_end :: ___builtin_va_copy :: ___builtin_va_arg ::
+ ___builtin_va_start :: ___builtin_membar :: ___builtin_annot_intval ::
+ ___builtin_annot :: ___builtin_sel :: ___builtin_memcpy_aligned ::
+ ___builtin_sqrt :: ___builtin_fsqrt :: ___builtin_fabsf ::
+ ___builtin_fabs :: ___builtin_ctzll :: ___builtin_ctzl :: ___builtin_ctz ::
+ ___builtin_clzll :: ___builtin_clzl :: ___builtin_clz ::
+ ___builtin_bswap16 :: ___builtin_bswap32 :: ___builtin_bswap ::
+ ___builtin_bswap64 :: ___builtin_ais_annot :: ___compcert_i64_umulh ::
+ ___compcert_i64_smulh :: ___compcert_i64_sar :: ___compcert_i64_shr ::
+ ___compcert_i64_shl :: ___compcert_i64_umod :: ___compcert_i64_smod ::
+ ___compcert_i64_udiv :: ___compcert_i64_sdiv :: ___compcert_i64_utof ::
+ ___compcert_i64_stof :: ___compcert_i64_utod :: ___compcert_i64_stod ::
+ ___compcert_i64_dtou :: ___compcert_i64_dtos :: ___compcert_va_composite ::
  ___compcert_va_float64 :: ___compcert_va_int64 :: ___compcert_va_int32 ::
  nil).
 

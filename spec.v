@@ -21,6 +21,11 @@ Fixpoint listrep (values: list Z) (ptr: val) : mpred :=
   | nil => !! (ptr = nullval) && emp
   end.
 
+Definition listrep_boxed (values: list Z) (dptr: val): mpred := 
+  EX ptr, 
+    data_at Ews (tptr t_list) ptr dptr *
+    listrep values ptr. 
+
 Lemma listrep_local_facts:
   forall values ptr,
    listrep values ptr |--
@@ -83,18 +88,15 @@ Definition uncons_spec: ident * funspec :=
       PROP () 
       PARAMS (dptr)
       GLOBALS (gv)
-      SEP (EX ptr: val, 
-        data_at Tsh (tptr t_list) ptr dptr 
-        * listrep (head::tail) ptr
-        * mem_mgr gv)
+      SEP (
+        listrep_boxed (head::tail) dptr;
+        mem_mgr gv)
     POST [ tint ]
-      EX ptr: val,
-        PROP ()
-        RETURN (Vint (Int.repr head))
-        SEP (EX ptr: val, 
-          data_at Tsh (tptr t_list) ptr dptr 
-          * listrep tail ptr
-          * mem_mgr gv).
+      PROP ()
+      RETURN (Vint (Int.repr head))
+      SEP (
+        listrep_boxed tail dptr;
+        mem_mgr gv).
 
 Definition nreverse_spec: ident * funspec := 
   DECLARE _nreverse
@@ -109,12 +111,12 @@ Definition nreverse_spec: ident * funspec :=
         RETURN (ptr)
         SEP (listrep (rev values) ptr).
 
-Definition t_queue := Tstruct _queue noattr.
+Definition t_queue := Tstruct _queue_t noattr.
 
 Definition queuerep (values: list Z) (ptr: val) : mpred :=
   EX (output input: list Z) (output_ptr input_ptr: val), 
     !!(values = app output (rev input)) &&
-    (data_at Tsh t_queue (input_ptr, output_ptr) ptr) *
+    (data_at Ews t_queue (input_ptr, output_ptr) ptr) *
     (listrep input input_ptr) * 
     (listrep output output_ptr).
 
@@ -122,9 +124,23 @@ Definition norm_queuerep (values: list Z) (ptr: val) : mpred :=
   EX (output input: list Z) (output_ptr input_ptr: val), 
     !!(output <> []) && 
     !!(values = app output (rev input)) &&
-    (data_at Tsh t_queue (input_ptr, output_ptr) ptr) *
+    (data_at Ews t_queue (input_ptr, output_ptr) ptr) *
     (listrep input input_ptr) * 
     (listrep output output_ptr).
+
+Definition new_queue_spec: ident * funspec := 
+  DECLARE _new_queue
+    WITH gv: globals
+    PRE [ ]
+      PROP () 
+      PARAMS ()
+      GLOBALS (gv)
+      SEP (mem_mgr gv)
+    POST [ tptr t_queue ]
+      EX queue_ptr, 
+        PROP ()
+        RETURN (queue_ptr)
+        SEP (queuerep [] queue_ptr; mem_mgr gv).
 
 Definition push_back_spec: ident * funspec := 
   DECLARE _push_back
@@ -232,6 +248,7 @@ Qed.
 Lemma body_uncons: semax_body Vprog Gprog f_uncons uncons_spec.
 Proof.
   start_function.
+  unfold listrep_boxed.
   Intros ptr.
   forward.
   unfold listrep.
@@ -249,6 +266,7 @@ Proof.
     entailer!. }
   forward.
   forward.
+  unfold listrep_boxed.
   Exists tail_ptr.
   entailer!.
 Qed.
@@ -362,40 +380,42 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma helper: forall head tail dptr ptr gv, 
-  listrep (head::tail) ptr * 
-  data_at Tsh (tptr t_list) ptr dptr * 
-  mem_mgr gv
-  |-- 
-    EX ptr: val, 
-      data_at Tsh (tptr t_list) ptr dptr 
-      * listrep (head::tail) ptr
-      * mem_mgr gv.
-Proof.
-  intros.
-  Exists ptr.
-  entailer!.
-Qed.
-  
-
 Lemma body_pop_front: semax_body Vprog Gprog f_pop_front pop_front_spec.
 Proof.
   start_function.
   forward_call.
   unfold norm_queuerep.
   Intros output input output_ptr input_ptr.
-    (* WITH head: Z, tail: list Z, dptr: val, gv: globals *)
+
   destruct output as [|output_head output_tail].
   { contradiction. }
+  inversion H0.
+  subst.
+  clear H H0.
 
-  forward_call (output_head, output_tail, _, gv).
+  unfold_data_at (data_at _ _ _ queue_ptr).
+  rewrite (field_at_data_at _ _ (DOT _out) _ _).
+  
+  sep_apply (data_at_local_facts 
+    Ews 
+    (nested_field_type t_queue (DOT _out)) 
+    output_ptr 
+    (field_address t_queue (DOT _out) queue_ptr)).
+  Intros.
+  sep_apply data_at_local_facts.
 
-  forward.
-  forward.
-  
-  forward.
-  sep_apply helper.
-  forward_call (output_head, output_tail, v_out, gv).
-  
-  forward.
-  Search Eaddrof.
+  forward_call (output_head, output_tail, (field_address t_queue (DOT _out) queue_ptr), gv).
+  - unfold listrep_boxed.
+    Exists output_ptr.
+    entailer!.
+  - forward.
+    unfold queuerep.
+    Exists output_tail input.
+    unfold listrep_boxed.
+    Intros output_tail_ptr.
+    Exists output_tail_ptr.
+    Exists input_ptr.
+    entailer!.
+    unfold_data_at (data_at _ _ _ queue_ptr).
+    entailer!.
+Qed.
